@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Brasil Analytics — Monitor Econômico do Brasil</title>
+  <meta name="description" content="Plataforma de monitoramento econômico do Brasil com dados públicos (Banco Central e IBGE), dashboards interativos, tendências e simulador de cenários.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563EB'/%3E%3Cpath d='M6 22l6-7 5 4 9-11' stroke='%23fff' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Bibliotecas leves: Chart.js + zoom (Hammer.js só para gestos de toque) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <script defer src="script.js"></script>
+</head>
+<body>
+  <!-- Fundo decorativo (efeito glassmorphism precisa de algo para "desfocar") -->
+  <div class="bg-blobs" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <div class="app">
+    <!-- ============ BARRA LATERAL ============ -->
+    <aside class="sidebar no-print" id="sidebar">
+      <div class="brand">
+        <span class="brand-logo"><svg viewBox="0 0 32 32" width="32" height="32"><rect width="32" height="32" rx="9" fill="#2563EB"/><path d="M6 22l6-7 5 4 9-11" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="brand-name">Brasil <b>Analytics</b></span>
+      </div>
+      <nav class="nav" id="nav" aria-label="Navegação principal">
+        <button data-view="painel"><i data-icon="home"></i><span>Painel</span></button>
+        <button data-view="graficos"><i data-icon="chart"></i><span>Gráficos</span></button>
+        <button data-view="assistente"><i data-icon="bot"></i><span>Assistente Econômico</span></button>
+        <button data-view="laboratorio"><i data-icon="flask"></i><span>Laboratório Econômico</span></button>
+        <button data-view="tendencias"><i data-icon="trend"></i><span>Tendências</span></button>
+        <button data-view="mapa"><i data-icon="map"></i><span>Mapa do Brasil</span></button>
+        <button data-view="comparacoes"><i data-icon="globe"></i><span>Rankings e Comparações</span></button>
+        <button data-view="exportar"><i data-icon="download"></i><span>Exportar</span></button>
+        <button data-view="sobre"><i data-icon="info"></i><span>Sobre</span></button>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="live-status" id="liveStatus">Carregando dados…</div>
+        <small>Fontes: Banco Central (SGS), IBGE (SIDRA), Banco Mundial</small>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+
+    <!-- ============ CONTEÚDO ============ -->
+    <div class="main">
+      <header class="topbar no-print">
+        <button class="icon-btn menu-btn" id="menuBtn" aria-label="Abrir menu"><i data-icon="menu"></i></button>
+        <div class="titles">
+          <h1 id="viewTitle">Painel</h1>
+          <p id="viewSub">Indicadores macroeconômicos do Brasil</p>
+        </div>
+        <div class="top-actions">
+          <span class="pill" id="lastUpdate">—</span>
+          <button class="btn ghost" id="refreshBtn"><i data-icon="refresh"></i><span class="hide-sm">Atualizar</span></button>
+          <button class="icon-btn" id="themeBtn" aria-label="Alternar tema"></button>
+        </div>
+      </header>
+
+      <main class="content">
+        <!-- ===== PAINEL ===== -->
+        <section class="view active" id="view-painel">
+          <div class="grid-cards" id="cards"></div>
+          <div class="two-col">
+            <article class="card">
+              <header class="card-h"><h2>Economia Brasileira Hoje</h2><span class="muted">Termômetro</span></header>
+              <div id="thermo"></div>
+            </article>
+            <article class="card">
+              <header class="card-h"><h2>Fontes de dados</h2><span class="muted">Atualização automática a cada 30 min</span></header>
+              <div id="sources"></div>
+            </article>
+          </div>
+        </section>
+
+        <!-- ===== GRÁFICOS ===== -->
+        <section class="view" id="view-graficos">
+          <div class="grid-2" id="chartsGrid"></div>
+        </section>
+
+        <!-- ===== ASSISTENTE ===== -->
+        <section class="view" id="view-assistente">
+          <article class="card chat-card">
+            <header class="card-h"><h2>Assistente Econômico</h2><span class="muted">Análises automáticas geradas a partir dos dados atuais</span></header>
+            <div class="chips" id="chatChips"></div>
+            <div class="chat-log" id="chatLog" aria-live="polite"></div>
+            <p class="note">As análises são geradas por regras determinísticas sobre os indicadores exibidos (sem modelo de linguagem externo). Conteúdo educacional.</p>
+          </article>
+        </section>
+
+        <!-- ===== LABORATÓRIO ===== -->
+        <section class="view" id="view-laboratorio">
+          <div class="lab-layout">
+            <article class="card lab-controls">
+              <header class="card-h"><h2>Parâmetros do cenário</h2></header>
+              <div id="labControls"></div>
+              <div class="preset-row">
+                <button class="btn ghost sm" data-preset="aperto">Aperto monetário</button>
+                <button class="btn ghost sm" data-preset="fiscal">Expansão de gastos</button>
+                <button class="btn ghost sm" data-preset="cambio">Choque cambial</button>
+                <button class="btn ghost sm" data-preset="reset">Restaurar valores atuais</button>
+              </div>
+              <div class="warning" role="note">⚠️ Ferramenta educacional. Não representa previsão oficial.</div>
+            </article>
+            <div class="lab-results">
+              <article class="card">
+                <header class="card-h"><h2>Interpretação automática</h2></header>
+                <div id="labInterpret" class="prose"></div>
+              </article>
+              <div class="grid-2">
+                <article class="card"><header class="card-h"><h3>Inflação (IPCA 12m)</h3></header><div class="chart-box sm"><canvas id="lab-inf"></canvas></div></article>
+                <article class="card"><header class="card-h"><h3>Desemprego</h3></header><div class="chart-box sm"><canvas id="lab-des"></canvas></div></article>
+                <article class="card"><header class="card-h"><h3>Crescimento econômico</h3></header><div class="chart-box sm"><canvas id="lab-pib"></canvas></div></article>
+                <article class="card"><header class="card-h"><h3>Dívida bruta / PIB</h3></header><div class="chart-box sm"><canvas id="lab-div"></canvas></div></article>
+              </div>
+              <article class="card">
+                <header class="card-h"><h3>Projeção trimestral do cenário</h3></header>
+                <div class="table-wrap"><table class="table" id="labTable"></table></div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== TENDÊNCIAS ===== -->
+        <section class="view" id="view-tendencias">
+          <article class="card">
+            <header class="card-h">
+              <h2>Tendências e projeções</h2>
+              <div class="toolbar"><select id="trendSelect" class="select" aria-label="Indicador"></select>
+              <button class="btn ghost sm" data-png="trend-chart"><i data-icon="image"></i>PNG</button></div>
+            </header>
+            <div class="chart-box"><canvas id="trend-chart"></canvas></div>
+            <p class="note">Método: regressão linear simples sobre a janela recente + médias móveis. A faixa sombreada indica ±1 desvio-padrão dos resíduos. Projeções estatísticas simples, <b>não</b> são previsões oficiais.</p>
+          </article>
+          <article class="card">
+            <header class="card-h"><h3>Resumo das projeções</h3></header>
+            <div class="table-wrap"><table class="table" id="trendTable"></table></div>
+          </article>
+        </section>
+
+        <!-- ===== MAPA ===== -->
+        <section class="view" id="view-mapa">
+          <div class="two-col map-layout">
+            <article class="card">
+              <header class="card-h">
+                <h2>Mapa interativo dos estados</h2>
+                <select id="mapMetric" class="select" aria-label="Métrica do mapa">
+                  <option value="pib">PIB estadual</option>
+                  <option value="pop">População</option>
+                  <option value="des">Desemprego</option>
+                  <option value="renda">Renda média</option>
+                </select>
+              </header>
+              <div class="tilemap" id="tilemap" role="group" aria-label="Estados do Brasil"></div>
+              <p class="note">Mapa em formato de cartograma (cada quadrado = 1 UF, posição aproximada). Dados ilustrativos (ordem de grandeza IBGE) — substitua por dados oficiais na evolução do projeto.</p>
+            </article>
+            <article class="card" id="stateDetail"></article>
+          </div>
+        </section>
+
+        <!-- ===== COMPARAÇÕES ===== -->
+        <section class="view" id="view-comparacoes">
+          <div class="tabs" id="cmpTabs" role="tablist">
+            <button class="active" data-tab="estados">Ranking dos estados</button>
+            <button data-tab="setores">Setores</button>
+            <button data-tab="crises">Linha do tempo de crises</button>
+            <button data-tab="governos">Comparação entre governos</button>
+            <button data-tab="intl">Comparador internacional</button>
+          </div>
+
+          <article class="card subview active" id="tab-estados">
+            <header class="card-h"><h2>Ranking dos estados</h2>
+              <select id="rankMetric" class="select"><option value="pib">PIB estadual (R$ bi)</option><option value="pop">População (mi)</option><option value="des">Desemprego (%)</option><option value="renda">Renda média (R$)</option></select>
+            </header>
+            <div id="rankList" class="rank-list"></div>
+          </article>
+
+          <article class="card subview" id="tab-setores">
+            <header class="card-h"><h2>Setores da economia</h2><span class="muted">Participação aproximada no valor adicionado</span></header>
+            <div class="chart-box tall"><canvas id="sector-chart"></canvas></div>
+            <p class="note">Valores aproximados para fins educacionais (referência: Contas Nacionais/IBGE).</p>
+          </article>
+
+          <article class="card subview" id="tab-crises">
+            <header class="card-h"><h2>Crises econômicas brasileiras</h2></header>
+            <ol class="timeline" id="timeline"></ol>
+          </article>
+
+          <article class="card subview" id="tab-governos">
+            <header class="card-h"><h2>Comparação entre governos</h2>
+              <select id="govMetric" class="select"><option value="pib">PIB médio (% a.a.)</option><option value="ipca">IPCA médio (% a.a.)</option><option value="selic">Selic média (% a.a.)</option></select>
+            </header>
+            <div class="chart-box"><canvas id="gov-chart"></canvas></div>
+            <p class="note">Médias aproximadas dos períodos, apenas descritivas. Resultados econômicos dependem de fatores internos e externos (ex.: crises globais, pandemia, preços de commodities) e a tabela não avalia mérito de nenhum governo.</p>
+            <div class="table-wrap"><table class="table" id="govTable"></table></div>
+          </article>
+
+          <article class="card subview" id="tab-intl">
+            <header class="card-h"><h2>Comparador internacional</h2>
+              <select id="intlMetric" class="select">
+                <option value="growth">Crescimento do PIB (%)</option><option value="infl">Inflação (%)</option>
+                <option value="unemp">Desemprego (%)</option><option value="debt">Dívida pública/PIB (%)</option><option value="gdp">PIB nominal (US$ tri)</option>
+              </select>
+            </header>
+            <div class="chart-box"><canvas id="intl-chart"></canvas></div>
+            <div class="table-wrap"><table class="table" id="intlTable"></table></div>
+            <p class="note" id="intlNote"></p>
+          </article>
+        </section>
+
+        <!-- ===== EXPORTAR ===== -->
+        <section class="view" id="view-exportar">
+          <div class="grid-3">
+            <article class="card export-card">
+              <i data-icon="file"></i><h3>Dados em CSV</h3>
+              <p>Baixe séries históricas em formato aberto (separador “;”, compatível com Excel em português).</p>
+              <select id="csvSelect" class="select"></select>
+              <button class="btn primary" id="csvBtn"><i data-icon="download"></i>Exportar CSV</button>
+            </article>
+            <article class="card export-card">
+              <i data-icon="image"></i><h3>Gráficos em PNG</h3>
+              <p>Salve qualquer gráfico da plataforma como imagem (com fundo sólido).</p>
+              <select id="pngSelect" class="select"></select>
+              <button class="btn primary" id="pngBtn"><i data-icon="download"></i>Exportar PNG</button>
+            </article>
+            <article class="card export-card">
+              <i data-icon="printer"></i><h3>Relatório em PDF</h3>
+              <p>Gera um relatório com todas as seções. Na janela de impressão, escolha “Salvar como PDF”.</p>
+              <button class="btn primary" id="pdfBtn"><i data-icon="printer"></i>Gerar PDF</button>
+            </article>
+          </div>
+        </section>
+
+        <!-- ===== SOBRE ===== -->
+        <section class="view" id="view-sobre">
+          <article class="card prose about">
+            <h2>Sobre</h2>
+            <p class="lead">Brasil Analytics é uma plataforma desenvolvida por Gabriel Nunes Fernandes com o objetivo de democratizar o acesso a informações econômicas e promover a educação financeira por meio de dados, visualizações interativas e simulações.</p>
+            <h3>Tecnologias</h3>
+            <p>HTML5, CSS3, JavaScript Vanilla e Chart.js — sem frameworks pesados.</p>
+            <h3>Fontes de dados</h3>
+            <p>Banco Central do Brasil (SGS), IBGE (SIDRA) e Banco Mundial. Quando uma API está indisponível, a plataforma usa dados simulados temporários, sinalizados com a etiqueta <span class="badge sim">simulado</span>. Mapa, setores, governos e comparador internacional usam valores aproximados para fins educacionais.</p>
+            <h3>Aviso</h3>
+            <p>Projeto educacional e de portfólio. As projeções e simulações não constituem previsão oficial nem recomendação de investimento.</p>
+          </article>
+        </section>
+      </main>
+      <footer class="footer no-print">Brasil Analytics · projeto educacional · dados públicos do BCB, IBGE e Banco Mundial</footer>
+    </div>
+  </div>
+</body>
+</html>
